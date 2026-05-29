@@ -1,4 +1,4 @@
-package io.kestra.plugin.templates;
+package io.kestra.plugin.scylladb;
 
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
@@ -28,7 +28,7 @@ import org.slf4j.Logger;
         )
     }
 )
-public class Example extends Task implements RunnableTask<Example.Output> {
+public class ScylladbTask extends Task implements RunnableTask<ScylladbTask.Output> {
     @Schema(
         title = "Short description for this input",
         description = "Full description of this input"
@@ -36,7 +36,7 @@ public class Example extends Task implements RunnableTask<Example.Output> {
     private Property<String> format;
 
     @Override
-    public Example.Output run(RunContext runContext) throws Exception {
+    public ScylladbTask.Output run(RunContext runContext) throws Exception {
         Logger logger = runContext.logger();
 
         String render = runContext.render(format).as(String.class).orElse("");

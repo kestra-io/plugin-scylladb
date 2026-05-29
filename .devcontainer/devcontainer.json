@@ -1,10 +1,10 @@
 {
-  "name": "plugin-template",
+  "name": "plugin-scylladb",
   "build": {
     "context": ".",
     "dockerfile": "Dockerfile"
   },
-  "workspaceFolder": "/workspaces/plugin-template",
+  "workspaceFolder": "/workspaces/plugin-scylladb",
   "forwardPorts": [8080],
   "customizations": {
     "vscode": {
