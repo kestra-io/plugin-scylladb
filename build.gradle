@@ -49,6 +49,8 @@ dependencies {
     annotationProcessor group: "io.kestra", name: "processor", version: kestraVersion
     compileOnly group: "io.kestra", name: "core", version: kestraVersion
     compileOnly group: "io.kestra", name: "script", version: kestraVersion
+
+    implementation "com.scylladb:java-driver-core:4.19.2.2"
 }
 
 
@@ -87,6 +89,10 @@ dependencies {
     testImplementation "org.junit.jupiter:junit-jupiter-engine"
     testImplementation "org.hamcrest:hamcrest"
     testImplementation "org.hamcrest:hamcrest-library"
+    testImplementation "org.mockito:mockito-core"
+    // Versions are provided by Kestra's platform.
+    testImplementation "org.testcontainers:testcontainers"
+    testImplementation "org.testcontainers:junit-jupiter"
 }
 
 /**********************************************************************************************************************\
@@ -161,6 +167,9 @@ jar {
 
 shadowJar {
     archiveClassifier.set(null)
+    filesMatching('META-INF/services/**') {
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
     mergeServiceFiles()
 }
 

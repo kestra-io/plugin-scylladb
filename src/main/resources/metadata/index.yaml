@@ -1,8 +1,12 @@
 group: io.kestra.plugin.scylladb
 name: "scylladb"
 title: "ScyllaDB"
-description: "ScyllaDB plugin for Kestra"
-body: ""
+description: "Query, update, and poll ScyllaDB using native CQL."
+body: |
+  Execute SELECT queries with FETCH_ONE, FETCH, or streamed STORE results.
+  Run DML and DDL with Execute, multiple SELECTs with Queries, and native CQL batches with Batch.
+  Poll pending rows with Trigger and explicitly acknowledge returned rows before execution delivery.
+  Connections support credentials, TLS, and a configurable request timeout.
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"
