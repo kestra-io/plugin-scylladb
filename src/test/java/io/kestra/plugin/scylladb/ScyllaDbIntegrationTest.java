@@ -245,15 +245,13 @@ class ScyllaDbIntegrationTest extends ScyllaDbContainer {
     void bindsNamedParametersWithoutInterpolatingValues() throws Exception {
         var quote = "O'Reilly";
         var injected = "x'; DELETE FROM events; --";
-        Execute insert = Execute.builder()
-            .id("insert").type(Execute.class.getName()).connection(connection())
-            .cql(Property.ofValue("INSERT INTO events (tenant, id, value) VALUES (:tenant, :id, :value)"))
-            .parameters(Property.ofValue(Map.of(
-                "tenant", "{{ inputs.tenant }}",
-                "id", "{{ inputs.id }}",
-                "value", injected
-            )))
-            .build();
+        Execute insert = yamlTask(Execute.class, """
+            cql: "INSERT INTO events (tenant, id, value) VALUES (:tenant, :id, :value)"
+            parameters:
+              tenant: "{{ inputs.tenant }}"
+              id: "{{ inputs.id }}"
+              value: "x'; DELETE FROM events; --"
+            """);
         assertTrue(insert.run(context(insert, Map.of("tenant", quote, "id", "7"))).isWasApplied());
 
         Query query = Query.builder()

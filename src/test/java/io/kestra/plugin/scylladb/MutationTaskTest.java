@@ -132,4 +132,37 @@ class MutationTaskTest {
         worker.join(5000);
         assertFalse(worker.isAlive());
     }
+
+    @Test
+    void killDuringConnectClosesSessionBeforeExecute() throws Exception {
+        var context = runContextFactory.of();
+        var connection = mock(ScyllaDbConnection.class);
+        var session = mock(CqlSession.class);
+        var started = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        when(connection.connect(context)).thenAnswer(invocation -> {
+            started.countDown();
+            assertTrue(release.await(5, TimeUnit.SECONDS));
+            return session;
+        });
+        var task = Execute.builder().connection(connection).cql(Property.ofValue("SELECT * FROM system.local")).build();
+        var failure = new java.util.concurrent.atomic.AtomicReference<Exception>();
+        var worker = new Thread(() -> {
+            try {
+                task.run(context);
+            } catch (Exception e) {
+                failure.set(e);
+            }
+        });
+        worker.start();
+        assertTrue(started.await(5, TimeUnit.SECONDS));
+        task.kill();
+        release.countDown();
+        worker.join(5000);
+        assertFalse(worker.isAlive());
+        assertInstanceOf(IllegalStateException.class, failure.get());
+        verify(session).close();
+        verify(session, never()).execute(any(Statement.class));
+        verify(session, never()).closeAsync();
+    }
 }

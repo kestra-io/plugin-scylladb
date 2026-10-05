@@ -1,6 +1,5 @@
 package io.kestra.plugin.scylladb;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 import com.datastax.oss.driver.api.core.CqlSession;
@@ -46,11 +45,21 @@ public abstract class AbstractScyllaDbTask extends Task {
     @EqualsAndHashCode.Exclude
     private transient volatile CqlSession activeSession;
 
+    @JsonIgnore
+    @Getter(AccessLevel.NONE)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private transient volatile boolean killed;
+
     protected CqlSession connect(RunContext runContext) throws Exception {
         if (connection == null) {
             throw new IllegalArgumentException("connection is required");
         }
         activeSession = connection.connect(runContext);
+        if (killed) {
+            activeSession.close();
+            throw new IllegalStateException("Task was killed");
+        }
         return activeSession;
     }
 
@@ -59,22 +68,11 @@ public abstract class AbstractScyllaDbTask extends Task {
             return Map.of();
         }
         Map<String, Object> rendered = runContext.render(parameters).asMap(String.class, Object.class);
-        if (rendered == null || rendered.isEmpty()) {
-            return Map.of();
-        }
-        Map<String, Object> values = new LinkedHashMap<>();
-        for (var entry : rendered.entrySet()) {
-            Object value = entry.getValue();
-            if (value instanceof String text && text.contains("{{")) {
-                values.put(entry.getKey(), runContext.render(text));
-            } else {
-                values.put(entry.getKey(), value);
-            }
-        }
-        return values;
+        return rendered == null ? Map.of() : rendered;
     }
 
     public void kill() {
+        killed = true;
         var session = activeSession;
         if (session != null) {
             session.closeAsync();
