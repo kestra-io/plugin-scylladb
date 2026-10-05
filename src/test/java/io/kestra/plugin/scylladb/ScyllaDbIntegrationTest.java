@@ -1,9 +1,6 @@
 package io.kestra.plugin.scylladb;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -541,9 +538,8 @@ class ScyllaDbIntegrationTest extends ScyllaDbContainer {
     private List<Map<String, Object>> readStored(RunContext context, URI uri) throws Exception {
         assertNotNull(uri);
         List<Map<String, Object>> rows = new ArrayList<>();
-        try (var input = context.storage().getFile(uri);
-             var reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
-            FileSerde.reader(reader, row -> rows.add((Map<String, Object>) row));
+        try (var input = context.storage().getFile(uri)) {
+            FileSerde.read(input, row -> rows.add((Map<String, Object>) row));
         }
         return rows;
     }

@@ -1,8 +1,5 @@
 package io.kestra.plugin.scylladb;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
@@ -182,9 +179,8 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     private static void forEachRow(RunContext runContext, QueryService.FetchedResult result, Consumer<Map<String, Object>> consumer) throws Exception {
         if (result.output().getUri() != null) {
             // putFile may consume the temp file; replay via the uploaded URI.
-            try (var input = runContext.storage().getFile(result.output().getUri());
-                 var reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8), FileSerde.BUFFER_SIZE)) {
-                FileSerde.reader(reader, value -> consumer.accept((Map<String, Object>) value));
+            try (var input = runContext.storage().getFile(result.output().getUri())) {
+                FileSerde.read(input, value -> consumer.accept((Map<String, Object>) value));
             }
         } else if (result.output().getRows() != null) {
             result.output().getRows().forEach(consumer);
