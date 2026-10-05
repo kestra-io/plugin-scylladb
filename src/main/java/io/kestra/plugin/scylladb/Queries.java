@@ -64,7 +64,7 @@ public class Queries extends AbstractScyllaDbTask implements RunnableTask<Querie
     @Schema(
         title = "Ordered CQL statements",
         description = "A non-empty list of non-blank SELECT statements. All statements are rendered and validated "
-            + "before the first is executed."
+            + "before the first is executed. Named :name markers bind the shared parameters map."
     )
     private Property<List<String>> cql;
 
@@ -95,12 +95,13 @@ public class Queries extends AbstractScyllaDbTask implements RunnableTask<Querie
         }
         var rFetchType = runContext.render(fetchType).as(FetchType.class).orElse(FetchType.FETCH);
         var rFetchSize = runContext.render(fetchSize).as(Integer.class).orElse(null);
+        var rParameters = renderParameters(runContext);
         rCql.forEach(statement -> QueryService.validate(statement, rFetchSize));
 
         var outputs = new ArrayList<Query.Output>(rCql.size());
         try (CqlSession session = connect(runContext)) {
             for (String statement : rCql) {
-                outputs.add(QueryService.fetch(session, runContext, statement, rFetchType, rFetchSize).output());
+                outputs.add(QueryService.fetch(session, runContext, statement, rFetchType, rFetchSize, rParameters).output());
             }
         }
         return Output.builder().outputs(outputs).build();

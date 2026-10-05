@@ -226,10 +226,8 @@ class ScyllaDbIntegrationTest extends ScyllaDbContainer {
             """);
         Execute.Output inserted = insert.run(context(insert, Map.of("value", "first")));
         assertTrue(inserted.isWasApplied());
-        assertNull(inserted.getAffectedRows());
         Execute.Output duplicate = insert.run(context(insert, Map.of("value", "duplicate")));
         assertFalse(duplicate.isWasApplied());
-        assertNull(duplicate.getAffectedRows());
 
         Execute update = execute("UPDATE events SET value = 'updated' WHERE tenant = 'test' AND id = 1 IF value = 'first'");
         assertTrue(update.run(context(update)).isWasApplied());
@@ -240,8 +238,71 @@ class ScyllaDbIntegrationTest extends ScyllaDbContainer {
         Execute delete = execute("DELETE FROM events WHERE tenant = 'test' AND id = 1");
         Execute.Output deleted = delete.run(context(delete));
         assertTrue(deleted.isWasApplied());
-        assertNull(deleted.getAffectedRows());
         assertNull(admin.execute("SELECT * FROM " + KEYSPACE + ".events WHERE tenant = 'test' AND id = 1").one());
+    }
+
+    @Test
+    void bindsNamedParametersWithoutInterpolatingValues() throws Exception {
+        var quote = "O'Reilly";
+        var injected = "x'; DELETE FROM events; --";
+        Execute insert = Execute.builder()
+            .id("insert").type(Execute.class.getName()).connection(connection())
+            .cql(Property.ofValue("INSERT INTO events (tenant, id, value) VALUES (:tenant, :id, :value)"))
+            .parameters(Property.ofValue(Map.of(
+                "tenant", "{{ inputs.tenant }}",
+                "id", "{{ inputs.id }}",
+                "value", injected
+            )))
+            .build();
+        assertTrue(insert.run(context(insert, Map.of("tenant", quote, "id", "7"))).isWasApplied());
+
+        Query query = Query.builder()
+            .id("query").type(Query.class.getName()).connection(connection())
+            .cql(Property.ofValue("SELECT value FROM events WHERE tenant = :tenant AND id = :id"))
+            .parameters(Property.ofValue(Map.of("tenant", quote, "id", 7)))
+            .fetchType(Property.ofValue(FetchType.FETCH_ONE))
+            .build();
+        assertEquals(injected, query.run(context(query)).getRow().get("value"));
+
+        Queries queries = Queries.builder()
+            .id("queries").type(Queries.class.getName()).connection(connection())
+            .cql(Property.ofValue(List.of(
+                "SELECT value FROM events WHERE tenant = :tenant AND id = :id",
+                "SELECT id FROM events WHERE tenant = :tenant"
+            )))
+            .parameters(Property.ofValue(Map.of("tenant", quote, "id", 7)))
+            .fetchType(Property.ofValue(FetchType.FETCH))
+            .build();
+        List<Query.Output> outputs = queries.run(context(queries)).getOutputs();
+        assertEquals(1L, outputs.get(0).getSize());
+        assertEquals(injected, outputs.get(0).getRows().getFirst().get("value"));
+        assertEquals(1L, outputs.get(1).getSize());
+
+        Batch batch = Batch.builder()
+            .id("batch").type(Batch.class.getName()).connection(connection())
+            .cql(Property.ofValue(List.of(
+                "INSERT INTO events (tenant, id, value) VALUES (:tenant, :id, :value)"
+            )))
+            .parameters(Property.ofValue(Map.of("tenant", quote, "id", 8, "value", "second")))
+            .build();
+        assertTrue(batch.run(context(batch)).isWasApplied());
+
+        Execute missing = Execute.builder()
+            .id("missing").type(Execute.class.getName()).connection(connection())
+            .cql(Property.ofValue("INSERT INTO events (tenant, id, value) VALUES (:tenant, :id, :value)"))
+            .parameters(Property.ofValue(Map.of("tenant", quote)))
+            .build();
+        assertThrows(IllegalArgumentException.class, () -> missing.run(context(missing)));
+
+        Execute anonymous = Execute.builder()
+            .id("anonymous").type(Execute.class.getName()).connection(connection())
+            .cql(Property.ofValue("INSERT INTO events (tenant, id, value) VALUES (?, ?, ?)"))
+            .parameters(Property.ofValue(Map.of("tenant", quote, "id", 9, "value", "nope")))
+            .build();
+        assertThrows(IllegalArgumentException.class, () -> anonymous.run(context(anonymous)));
+
+        var count = admin.prepare("SELECT count(*) FROM " + KEYSPACE + ".events WHERE tenant = ?");
+        assertEquals(2L, admin.execute(count.bind(quote)).one().getLong(0));
     }
 
     @Test

@@ -51,7 +51,7 @@ public class Execute extends AbstractScyllaDbTask implements RunnableTask<Execut
     @NotNull
     @ToString.Exclude
     @PluginProperty(group = "main")
-    @Schema(title = "CQL statement", description = "One non-blank INSERT, UPDATE, DELETE, or DDL statement. Pebble expressions are rendered before execution; do not interpolate untrusted values.")
+    @Schema(title = "CQL statement", description = "One non-blank INSERT, UPDATE, DELETE, or DDL statement. Bind dynamic values with named :name markers and parameters instead of interpolating them into the statement.")
     private Property<String> cql;
 
     @Override
@@ -59,9 +59,10 @@ public class Execute extends AbstractScyllaDbTask implements RunnableTask<Execut
         var rCql = ScyllaDbConnection.requireNonBlank(
             runContext.render(cql).as(String.class).orElse(null), "cql"
         );
+        var rParameters = renderParameters(runContext);
         try (var session = connect(runContext)) {
             return Output.builder()
-                .wasApplied(session.execute(rCql).wasApplied())
+                .wasApplied(session.execute(QueryService.statement(session, rCql, rParameters, null)).wasApplied())
                 .build();
         }
     }
@@ -71,8 +72,5 @@ public class Execute extends AbstractScyllaDbTask implements RunnableTask<Execut
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(title = "Was applied", description = "For conditional writes, whether the condition was satisfied. True for successful non-conditional statements.")
         private final boolean wasApplied;
-
-        @Schema(title = "Affected rows", description = "Always null: the CQL protocol does not report the number of affected rows.", nullable = true)
-        private final Long affectedRows;
     }
 }

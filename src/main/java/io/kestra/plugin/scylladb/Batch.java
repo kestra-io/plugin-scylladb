@@ -2,7 +2,6 @@ package io.kestra.plugin.scylladb;
 
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.DefaultBatchType;
-import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -81,7 +80,7 @@ public class Batch extends AbstractScyllaDbTask implements RunnableTask<Batch.Ou
     @NotNull
     @ToString.Exclude
     @PluginProperty(group = "main")
-    @Schema(title = "CQL statements", description = "Non-empty list of non-blank CQL mutations, with at most 65535 statements. Each entry is one statement, not a BEGIN BATCH block. Do not interpolate untrusted values.")
+    @Schema(title = "CQL statements", description = "Non-empty list of non-blank CQL mutations, with at most 65535 statements. Each entry is one statement, not a BEGIN BATCH block. Named :name markers bind the shared parameters map.")
     private Property<List<String>> cql;
 
     @Builder.Default
@@ -103,11 +102,15 @@ public class Batch extends AbstractScyllaDbTask implements RunnableTask<Batch.Ou
             throw new IllegalArgumentException("cql must contain between 1 and 65535 statements");
         }
         var rBatchType = runContext.render(batchType).as(BatchType.class).orElse(BatchType.LOGGED);
-        var batch = BatchStatement.builder(DefaultBatchType.valueOf(rBatchType.name()));
+        var rParameters = renderParameters(runContext);
         for (String statement : rCql) {
-            batch.addStatement(SimpleStatement.newInstance(ScyllaDbConnection.requireNonBlank(statement, "cql entry")));
+            ScyllaDbConnection.requireNonBlank(statement, "cql entry");
         }
         try (var session = connect(runContext)) {
+            var batch = BatchStatement.builder(DefaultBatchType.valueOf(rBatchType.name()));
+            for (String statement : rCql) {
+                batch.addStatement(QueryService.statement(session, statement, rParameters, null));
+            }
             return Output.builder()
                 .wasApplied(session.execute(batch.build()).wasApplied())
                 .statements(rCql.size())

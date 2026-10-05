@@ -4,7 +4,7 @@ Run CQL against ScyllaDB using its native protocol, normally on port 9042.
 
 - `Query` executes a SELECT and returns a single row (`FETCH_ONE`), every row (`FETCH`), or an internal-storage Ion file (`STORE`).
 - `Queries` executes SELECT statements sequentially and returns `outputs` in statement order.
-- `Execute` executes INSERT, UPDATE, DELETE, and DDL. `wasApplied` reports conditional-write success; `affectedRows` is null because CQL does not report affected-row counts.
+- `Execute` executes INSERT, UPDATE, DELETE, and DDL. `wasApplied` reports conditional-write success. CQL does not provide an affected-row count.
 - `Batch` executes a native LOGGED, UNLOGGED, or COUNTER batch. `statements` counts submitted statements, not affected rows. Keep batches small, preferably within a partition. COUNTER batches cannot contain ordinary mutations; batches cannot contain SELECT or DDL and are not SQL transactions.
 - `Trigger` polls a SELECT and acknowledges each returned row before creating an execution.
 
@@ -26,7 +26,7 @@ Optional `fetchSize` is a positive driver page-size hint for balancing memory us
 
 Rows use selected column names. UUIDs, temporal values, addresses, and CQL durations are strings; blobs are base64 strings; tuples and collections are lists; UDTs are maps. CQL maps with non-string keys are lists of `{key, value}` entries to preserve key types. Numbers, booleans, and nulls retain their value types.
 
-CQL templates are rendered before execution. Do not interpolate untrusted input into query strings. Trigger acknowledgement values are instead bound using prepared statements.
+Bind dynamic values with `parameters` and named `:name` markers. Values are rendered, then bound on a prepared statement using each marker's CQL type, so quotes in the value cannot change the statement. Do not interpolate untrusted input into the CQL text. The same map is shared by every statement in `Queries` and `Batch`; keys that a statement does not use are ignored. Trigger acknowledgement values are bound the same way from each selected row.
 
 ## Polling and acknowledgement
 

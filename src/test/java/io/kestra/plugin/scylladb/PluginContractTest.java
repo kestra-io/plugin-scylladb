@@ -38,9 +38,11 @@ class PluginContractTest {
             Execute.Output.class, Batch.Output.class
         )) {
             for (var field : type.getDeclaredFields()) {
-                if (!field.isSynthetic() && !java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
-                    assertNotNull(field.getAnnotation(Schema.class), type.getSimpleName() + "." + field.getName());
+                if (field.isSynthetic() || java.lang.reflect.Modifier.isStatic(field.getModifiers())
+                    || java.lang.reflect.Modifier.isTransient(field.getModifiers())) {
+                    continue;
                 }
+                assertNotNull(field.getAnnotation(Schema.class), type.getSimpleName() + "." + field.getName());
             }
         }
     }

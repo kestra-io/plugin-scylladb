@@ -54,6 +54,34 @@ import lombok.experimental.SuperBuilder;
                     fetchType: STORE
                     fetchSize: 1000
                 """
+        ),
+        @Example(
+            title = "Query one tenant from a flow input",
+            full = true,
+            code = """
+                id: scylladb_query_by_tenant
+                namespace: company.team
+
+                inputs:
+                  - id: tenant
+                    type: STRING
+                    defaults: demo
+
+                tasks:
+                  - id: by_tenant
+                    type: io.kestra.plugin.scylladb.Query
+                    connection:
+                      contactPoints:
+                        - "{{ secret('SCYLLADB_HOST') }}:9042"
+                      localDatacenter: datacenter1
+                      keyspace: kestra
+                      username: "{{ secret('SCYLLADB_USERNAME') }}"
+                      password: "{{ secret('SCYLLADB_PASSWORD') }}"
+                    cql: SELECT id, value FROM events WHERE tenant = :tenant
+                    parameters:
+                      tenant: "{{ inputs.tenant }}"
+                    fetchType: FETCH
+                """
         )
     }
 )
@@ -61,7 +89,7 @@ public class Query extends AbstractScyllaDbTask implements RunnableTask<Query.Ou
     @NotNull
     @ToString.Exclude
     @PluginProperty(group = "main")
-    @Schema(title = "CQL statement", description = "One non-blank SELECT CQL statement, rendered before execution. Do not interpolate untrusted values.")
+    @Schema(title = "CQL statement", description = "One non-blank SELECT CQL statement. Bind dynamic values with named :name markers and parameters instead of interpolating them into the statement.")
     private Property<String> cql;
 
     @Builder.Default
@@ -89,10 +117,11 @@ public class Query extends AbstractScyllaDbTask implements RunnableTask<Query.Ou
             .orElseThrow(() -> new IllegalArgumentException("cql is required"));
         var rFetchType = runContext.render(fetchType).as(FetchType.class).orElse(FetchType.FETCH);
         var rFetchSize = runContext.render(fetchSize).as(Integer.class).orElse(null);
+        var rParameters = renderParameters(runContext);
         QueryService.validate(rCql, rFetchSize);
 
         try (CqlSession session = connect(runContext)) {
-            return QueryService.fetch(session, runContext, rCql, rFetchType, rFetchSize).output();
+            return QueryService.fetch(session, runContext, rCql, rFetchType, rFetchSize, rParameters).output();
         }
     }
 

@@ -4,6 +4,7 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.DefaultBatchType;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
+import com.datastax.oss.driver.api.core.cql.Statement;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
@@ -13,6 +14,8 @@ import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -30,14 +33,13 @@ class MutationTaskTest {
         var session = mock(CqlSession.class);
         var resultSet = mock(ResultSet.class);
         when(connection.connect(context)).thenReturn(session);
-        when(session.execute("UPDATE events SET value = 'new' WHERE id = 1 IF value = 'old'")).thenReturn(resultSet);
+        when(session.execute(any(Statement.class))).thenReturn(resultSet);
         when(resultSet.wasApplied()).thenReturn(false);
 
         var output = Execute.builder().connection(connection)
             .cql(Property.ofExpression("{{ statement }}")).build().run(context);
 
         assertFalse(output.isWasApplied());
-        assertNull(output.getAffectedRows());
         verify(session).close();
     }
 
@@ -47,7 +49,7 @@ class MutationTaskTest {
         var connection = mock(ScyllaDbConnection.class);
         var session = mock(CqlSession.class);
         when(connection.connect(context)).thenReturn(session);
-        when(session.execute("invalid")).thenThrow(new IllegalStateException("server rejected statement"));
+        when(session.execute(any(Statement.class))).thenThrow(new IllegalStateException("server rejected statement"));
         var task = Execute.builder().connection(connection).cql(Property.ofValue("invalid")).build();
 
         assertThrows(IllegalStateException.class, () -> task.run(context));
@@ -97,5 +99,37 @@ class MutationTaskTest {
         assertThrows(IllegalArgumentException.class, () -> Batch.builder().connection(connection)
             .cql(Property.ofValue(List.of("valid", " "))).build().run(context));
         verifyNoInteractions(connection);
+    }
+
+    @Test
+    void killClosesTheActiveSession() throws Exception {
+        var context = runContextFactory.of();
+        var connection = mock(ScyllaDbConnection.class);
+        var session = mock(CqlSession.class);
+        var started = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        when(connection.connect(context)).thenReturn(session);
+        when(session.execute(any(Statement.class))).thenAnswer(invocation -> {
+            started.countDown();
+            assertTrue(release.await(5, TimeUnit.SECONDS));
+            var resultSet = mock(ResultSet.class);
+            when(resultSet.wasApplied()).thenReturn(true);
+            return resultSet;
+        });
+        var task = Execute.builder().connection(connection).cql(Property.ofValue("SELECT * FROM system.local")).build();
+        var worker = new Thread(() -> {
+            try {
+                task.run(context);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+        worker.start();
+        assertTrue(started.await(5, TimeUnit.SECONDS));
+        task.kill();
+        verify(session).closeAsync();
+        release.countDown();
+        worker.join(5000);
+        assertFalse(worker.isAlive());
     }
 }
