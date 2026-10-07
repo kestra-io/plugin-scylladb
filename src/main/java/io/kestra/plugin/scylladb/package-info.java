@@ -1,6 +1,6 @@
 @PluginSubGroup(
     title = "ScyllaDB",
-    description = "ScyllaDB plugin for Kestra",
+    description = "Query, update, and poll ScyllaDB using native CQL.",
     categories = PluginSubGroup.PluginCategory.DATA
 )
 package io.kestra.plugin.scylladb;

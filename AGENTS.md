@@ -19,10 +19,6 @@ Single-module plugin. Source packages under `io.kestra.plugin`:
 
 - `scylladb`
 
-Infrastructure dependencies (Docker Compose services):
-
-- `app`
-
 Tests provision the official `scylladb/scylla` image through Testcontainers; Docker and Java 21 are required.
 
 ### Key Plugin Classes
