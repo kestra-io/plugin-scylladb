@@ -39,14 +39,37 @@
 
 ## Why
 
-- What user problem does this solve? Teams need a concrete starting point for building and validating new Kestra plugins without recreating the same project scaffolding from scratch.
-- Why would a team adopt this plugin in a workflow? It gives plugin authors a ready-made reference repo they can adapt alongside their own build, test, and publishing workflow.
-- What operational/business outcome does it enable? It shortens plugin delivery time, reduces setup mistakes, and makes internal or partner plugin development more repeatable.
+- Run native CQL directly from Kestra flows without cqlsh or custom scripts.
+- Compose ScyllaDB queries, ingestion, and maintenance with other Kestra plugins.
+- Fetch structured rows or stream large results into Kestra internal storage.
 
 ## What
 
 - Provides plugin components under `io.kestra.plugin.scylladb`.
-- Includes classes such as `Example`, `Trigger`.
+- `Query`: SELECT with `FETCH_ONE`, `FETCH`, or `STORE`.
+- `Queries`: sequential SELECTs and per-statement outputs.
+- `Execute`: INSERT, UPDATE, DELETE, and DDL.
+- `Batch`: LOGGED, UNLOGGED, or COUNTER batches.
+- `Trigger`: polling with explicit per-row acknowledgement.
+- `ScyllaDbConnection`: shared credentials, TLS, and optional request timeout.
+
+The trigger acknowledges rows **before** flow processing. Database acknowledgement and execution delivery are not atomic; partial failures can lose events and concurrent consumers can duplicate them. It is not a lossless message queue. See the [plugin documentation](src/main/resources/doc/io.kestra.plugin.scylladb.md) for connection settings, value encodings, and a complete polling example.
+
+## Build and test
+
+Requires Java 21 and Docker with Linux containers. Integration tests start the official `scylladb/scylla` image using Testcontainers.
+
+```sh
+./gradlew test
+./gradlew build
+./gradlew lintPluginDocs
+```
+
+On Windows, use `gradlew.bat`.
+
+If Docker 29 rejects the Docker client API version bundled with the Kestra-managed
+Testcontainers version, set `JAVA_TOOL_OPTIONS=-Dapi.version=1.44` for the test run.
+This is a local test compatibility setting, not a ScyllaDB connection option.
 
 ## Documentation
 * Full documentation can be found under: [kestra.io/docs](https://kestra.io/docs)
