@@ -89,8 +89,8 @@ dependencies {
     testImplementation "org.hamcrest:hamcrest-library"
     testImplementation "org.mockito:mockito-core"
     // Versions are provided by Kestra's platform.
-    testImplementation "org.testcontainers:testcontainers"
-    testImplementation "org.testcontainers:junit-jupiter"
+    testImplementation "org.testcontainers:testcontainers:2.0.5"
+    testImplementation "org.testcontainers:testcontainers-junit-jupiter:2.0.5"
 }
 
 /**********************************************************************************************************************\
